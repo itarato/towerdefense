@@ -1,5 +1,3 @@
-use std::ops::Sub;
-
 use bevy::math::Vec2;
 
 fn slope(lhs: Vec2, rhs: Vec2) -> f32 {
@@ -32,8 +30,14 @@ pub(crate) fn calculate_next_position_on_path(
     time_delta_secs: f32,
     speed: f32,
 ) -> Vec2 {
-    for i in 0..path.len() {
-        let rev_i = path.len() - 1 - i;
+    for i in 0..path.len() - 1 {
+        // Going reverse so later path is recognized first in case of shared points.
+        let rev_i = path.len() - 2 - i;
+        if point_on_path((x, y).into(), (path[rev_i], path[rev_i + 1])) {
+            todo!()
+
+            break;
+        }
     }
 
     unimplemented!()
