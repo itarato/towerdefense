@@ -1,10 +1,12 @@
 mod math;
 
-use bevy::prelude::*;
+use bevy::{color::palettes::css::RED, prelude::*};
+
+use crate::math::{calculate_next_position_on_path, path_completed};
 
 #[derive(Resource)]
 struct GameState {
-    score: u32,
+    base_life: u32,
 }
 
 #[derive(Resource)]
@@ -21,12 +23,35 @@ struct Enemy;
 #[derive(Resource)]
 struct TowerSpawnTimer(Timer);
 
+#[derive(Component)]
+struct ScoreText;
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.spawn(Camera2d);
+
+    commands
+        .spawn((
+            Text::default(),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(10.0),
+                top: Val::Px(10.0),
+                ..default()
+            },
+        ))
+        .with_child((
+            TextSpan::default(),
+            TextFont {
+                font_size: 24.0,
+                ..default()
+            },
+            TextColor(RED.into()),
+            ScoreText,
+        ));
 
     let shapes = [meshes.add(Circle::new(48.0))];
 
@@ -41,9 +66,22 @@ fn setup(
     }
 }
 
-fn update_enemy_movement(mut query: Query<&mut Transform, With<Enemy>>, time: Res<Time>) {
+fn update_enemy_movement(
+    mut query: Query<&mut Transform, With<Enemy>>,
+    time: Res<Time>,
+    game_map: Res<GameMap>,
+) {
     for mut transform in &mut query {
-        transform.translation.x += 100.0 * time.delta_secs();
+        // transform.translation.x += 100.0 * time.delta_secs();
+        if !path_completed(&transform.translation.xy(), &game_map.path) {
+            let next_pos = calculate_next_position_on_path(
+                &transform.translation.xy(),
+                &game_map.path,
+                100.0 * time.delta_secs(),
+            );
+            transform.translation.x = next_pos.x;
+            transform.translation.y = next_pos.y;
+        }
     }
 }
 
@@ -71,21 +109,34 @@ fn update_enemy_spawns(
     }
 }
 
+fn update_score(mut query: Query<&mut TextSpan, With<ScoreText>>, game_state: Res<GameState>) {
+    for mut span in &mut query {
+        **span = format!("Health: {}", game_state.base_life);
+    }
+}
+
 struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(GameMap {
-            path: vec![
-                (-200.0, -200.0).into(),
-                (-200.0, 0.0).into(),
-                (200.0, 0.0).into(),
-                (200.0, 200.0).into(),
-            ],
-        })
-        .insert_resource(TowerSpawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
-        .add_systems(Startup, setup)
-        .add_systems(Update, (update_enemy_spawns, update_enemy_movement).chain());
+        app.insert_resource(GameState { base_life: 100 })
+            .insert_resource(GameMap {
+                path: vec![
+                    (-200.0, -200.0).into(),
+                    (-200.0, 0.0).into(),
+                    (200.0, 0.0).into(),
+                    (200.0, 200.0).into(),
+                ],
+            })
+            .insert_resource(TowerSpawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
+            .add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (
+                    (update_enemy_spawns, update_enemy_movement).chain(),
+                    update_score,
+                ),
+            );
     }
 }
 
