@@ -1,6 +1,6 @@
 use bevy::math::Vec2;
 
-const FLOAT_PRECISION: f32 = 1.0;
+const PIXEL_MOVE_FLOAT_PRECISION: f32 = 1.0;
 
 fn slope(lhs: &Vec2, rhs: &Vec2) -> f32 {
     (lhs.x - rhs.x) / (lhs.y - rhs.y)
@@ -9,25 +9,27 @@ fn slope(lhs: &Vec2, rhs: &Vec2) -> f32 {
 fn between(p: f32, lhs: f32, rhs: f32) -> bool {
     let min = lhs.min(rhs);
     let max = lhs.max(rhs);
-    min - FLOAT_PRECISION <= p && p <= max + FLOAT_PRECISION
+    min - PIXEL_MOVE_FLOAT_PRECISION <= p && p <= max + PIXEL_MOVE_FLOAT_PRECISION
 }
 
 fn point_on_path(p: &Vec2, path: (&Vec2, &Vec2)) -> bool {
     assert_ne!(path.0, path.1);
 
-    if p.abs_diff_eq(*path.0, 0.1) || p.abs_diff_eq(*path.1, FLOAT_PRECISION) {
+    if p.abs_diff_eq(*path.0, 0.1) || p.abs_diff_eq(*path.1, PIXEL_MOVE_FLOAT_PRECISION) {
         return true;
     }
 
     let main_slope = slope(path.0, path.1);
     let sub_slope = slope(path.0, p);
-    if (main_slope - sub_slope).abs() > FLOAT_PRECISION {
+    if (main_slope - sub_slope).abs() > PIXEL_MOVE_FLOAT_PRECISION {
         return false;
     }
 
     between(p.x, path.0.x, path.1.x) && between(p.y, path.0.y, path.1.y)
 }
 
+// TODO: Each move we get a little deviation from the path.
+//       We could re-adjust each move.
 pub(crate) fn calculate_next_position_on_path(
     point: &Vec2,
     path: &Vec<Vec2>,
