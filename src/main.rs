@@ -135,24 +135,32 @@ fn update_shooting(
         return;
     }
 
+    let mut rng = rand::rng();
+    let enemies_vec = enemies.iter().collect::<Vec<_>>();
+
+    if enemies_vec.is_empty() {
+        return;
+    }
+
     if let Some(tower_transform) = towers.iter().next() {
-        if let Some((enemy_entity, enemy_transform)) = enemies.iter().next() {
-            let line_handle = meshes.add(Segment2d::new(
-                Vec2::default(),
-                enemy_transform.translation.xy() - tower_transform.translation.xy(),
-            ));
-            commands.spawn((
-                Bullet,
-                LifeSpan(1.0),
-                Mesh2d(line_handle),
-                MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.8, 0.2, 0.1, 1.0)))),
-                Transform::from_xyz(
-                    tower_transform.translation.x,
-                    tower_transform.translation.y,
-                    0.0,
-                ),
-            ));
-        }
+        let random_enemy = enemies_vec[rng.random_range(0..enemies_vec.len())];
+        let enemy_transform = random_enemy.1;
+
+        let line_handle = meshes.add(Segment2d::new(
+            Vec2::default(),
+            enemy_transform.translation.xy() - tower_transform.translation.xy(),
+        ));
+        commands.spawn((
+            Bullet,
+            LifeSpan(0.3),
+            Mesh2d(line_handle),
+            MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.8, 0.2, 0.1, 1.0)))),
+            Transform::from_xyz(
+                tower_transform.translation.x,
+                tower_transform.translation.y,
+                0.0,
+            ),
+        ));
     }
 }
 
