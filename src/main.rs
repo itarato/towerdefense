@@ -1,12 +1,12 @@
 mod math;
 
-use bevy::{color::palettes::css::RED, prelude::*};
+use bevy::{color::palettes::css::RED, core_pipeline::core_3d::Transmissive3d, prelude::*};
 
 use crate::math::{calculate_next_position_on_path, path_completed};
 
 #[derive(Resource)]
 struct GameState {
-    base_life: u32,
+    base_life: i32,
 }
 
 #[derive(Resource)]
@@ -23,8 +23,17 @@ struct Enemy;
 #[derive(Resource)]
 struct TowerSpawnTimer(Timer);
 
+#[derive(Resource)]
+struct ShootingTimer(Timer);
+
 #[derive(Component)]
 struct ScoreText;
+
+#[derive(Component)]
+struct Bullet;
+
+#[derive(Component)]
+struct LifeSpan(f32);
 
 fn setup(
     mut commands: Commands,
@@ -53,27 +62,31 @@ fn setup(
             ScoreText,
         ));
 
-    let shapes = [meshes.add(Circle::new(48.0))];
+    let mesh_handles = [meshes.add(Circle::new(48.0))];
 
-    for shape in shapes.into_iter() {
+    for mesh_handle in mesh_handles.into_iter() {
         let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
         commands.spawn((
             Tower,
-            Mesh2d(shape),
+            Mesh2d(mesh_handle),
             MeshMaterial2d(materials.add(color)),
-            Transform::from_xyz(100.0, 200.0, 0.0),
+            Transform::from_xyz(-100.0, 200.0, 0.0),
         ));
     }
 }
 
 fn update_enemy_movement(
-    mut query: Query<&mut Transform, With<Enemy>>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Transform), With<Enemy>>,
     time: Res<Time>,
     game_map: Res<GameMap>,
+    mut game_state: ResMut<GameState>,
 ) {
-    for mut transform in &mut query {
-        // transform.translation.x += 100.0 * time.delta_secs();
-        if !path_completed(&transform.translation.xy(), &game_map.path) {
+    for (entity, mut transform) in &mut query {
+        if path_completed(&transform.translation.xy(), &game_map.path) {
+            commands.entity(entity).despawn();
+            game_state.base_life -= 5;
+        } else {
             let next_pos = calculate_next_position_on_path(
                 &transform.translation.xy(),
                 &game_map.path,
@@ -109,6 +122,35 @@ fn update_enemy_spawns(
     }
 }
 
+fn update_shooting(
+    mut commands: Commands,
+    towers: Query<&Transform, With<Tower>>,
+    enemies: Query<(Entity, &Transform), With<Enemy>>,
+    time: Res<Time>,
+    mut shooting_timer: ResMut<ShootingTimer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    if !shooting_timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
+
+    if let Some(tower_transform) = towers.iter().next() {
+        if let Some((enemy_entity, enemy_transform)) = enemies.iter().next() {
+            let line_handle = meshes.add(Segment2d::new(
+                Vec2::default(),
+                tower_transform.translation.xy() - enemy_transform.translation.xy(),
+            ));
+            commands.spawn((
+                Bullet,
+                LifeSpan(1.0),
+                Mesh2d(line_handle),
+                MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.8, 0.2, 0.1, 1.0)))),
+            ));
+        }
+    }
+}
+
 fn update_score(mut query: Query<&mut TextSpan, With<ScoreText>>, game_state: Res<GameState>) {
     for mut span in &mut query {
         **span = format!("Health: {}", game_state.base_life);
@@ -128,12 +170,20 @@ impl Plugin for GamePlugin {
                     (200.0, 200.0).into(),
                 ],
             })
-            .insert_resource(TowerSpawnTimer(Timer::from_seconds(1.0, TimerMode::Once)))
+            .insert_resource(TowerSpawnTimer(Timer::from_seconds(
+                1.0,
+                TimerMode::Repeating,
+            )))
+            .insert_resource(ShootingTimer(Timer::from_seconds(
+                1.0,
+                TimerMode::Repeating,
+            )))
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
                 (
                     (update_enemy_spawns, update_enemy_movement).chain(),
+                    update_shooting,
                     update_score,
                 ),
             );
