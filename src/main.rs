@@ -1,8 +1,8 @@
 mod math;
 
-use bevy::{color::palettes::css::RED, core_pipeline::core_3d::Transmissive3d, prelude::*};
-
 use crate::math::{calculate_next_position_on_path, path_completed};
+use bevy::{color::palettes::css::RED, core_pipeline::core_3d::Transmissive3d, prelude::*};
+use rand::prelude::*;
 
 #[derive(Resource)]
 struct GameState {
@@ -139,13 +139,18 @@ fn update_shooting(
         if let Some((enemy_entity, enemy_transform)) = enemies.iter().next() {
             let line_handle = meshes.add(Segment2d::new(
                 Vec2::default(),
-                tower_transform.translation.xy() - enemy_transform.translation.xy(),
+                enemy_transform.translation.xy() - tower_transform.translation.xy(),
             ));
             commands.spawn((
                 Bullet,
                 LifeSpan(1.0),
                 Mesh2d(line_handle),
                 MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.8, 0.2, 0.1, 1.0)))),
+                Transform::from_xyz(
+                    tower_transform.translation.x,
+                    tower_transform.translation.y,
+                    0.0,
+                ),
             ));
         }
     }
@@ -154,6 +159,19 @@ fn update_shooting(
 fn update_score(mut query: Query<&mut TextSpan, With<ScoreText>>, game_state: Res<GameState>) {
     for mut span in &mut query {
         **span = format!("Health: {}", game_state.base_life);
+    }
+}
+
+fn update_life_span(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut LifeSpan)>,
+    time: Res<Time>,
+) {
+    for (entity, mut life_span) in &mut query {
+        life_span.0 -= time.delta().as_secs_f32();
+        if life_span.0 <= 0.0 {
+            commands.entity(entity).despawn();
+        }
     }
 }
 
@@ -182,10 +200,13 @@ impl Plugin for GamePlugin {
             .add_systems(
                 Update,
                 (
-                    (update_enemy_spawns, update_enemy_movement).chain(),
+                    update_enemy_spawns,
+                    update_enemy_movement,
                     update_shooting,
+                    update_life_span,
                     update_score,
-                ),
+                )
+                    .chain(),
             );
     }
 }

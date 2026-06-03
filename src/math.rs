@@ -1,6 +1,6 @@
 use bevy::math::Vec2;
 
-const PIXEL_MOVE_FLOAT_PRECISION: f32 = 1.0;
+const PIXEL_MOVE_FLOAT_PRECISION: f32 = 0.4;
 
 fn slope(lhs: &Vec2, rhs: &Vec2) -> f32 {
     (lhs.x - rhs.x) / (lhs.y - rhs.y)
@@ -56,7 +56,10 @@ pub(crate) fn calculate_next_position_on_path(
                     return path_end.move_towards(*path_next_end, distance_left);
                 }
             } else {
-                return point.move_towards(*path_end, distance);
+                // Here we re-adjust the point to be more accurately on the line between start-end.
+                let current_dist = path_start.distance(*point);
+                let full_dist = current_dist + distance;
+                return path_start.move_towards(*path_end, full_dist);
             }
             // Unreachable.
         }
