@@ -1,7 +1,11 @@
 mod math;
 
 use crate::math::{calculate_next_position_on_path, path_completed};
-use bevy::{color::palettes::css::RED, core_pipeline::core_3d::Transmissive3d, prelude::*};
+use bevy::{
+    color::palettes::css::{RED, YELLOW},
+    core_pipeline::core_3d::Transmissive3d,
+    prelude::*,
+};
 use rand::prelude::*;
 
 #[derive(Resource)]
@@ -28,6 +32,9 @@ struct ShootingTimer(Timer);
 
 #[derive(Component)]
 struct ScoreText;
+
+#[derive(Component)]
+struct EnemyHealthText;
 
 #[derive(Component)]
 struct Bullet;
@@ -112,11 +119,27 @@ fn update_enemy_spawns(
 
         for shape in shapes.into_iter() {
             let color = Color::Srgba(Srgba::new(0.2, 0.8, 0.6, 1.0));
-            commands.spawn((
-                Enemy,
-                Mesh2d(shape),
-                MeshMaterial2d(materials.add(color)),
-                Transform::from_xyz(spawn_point.x, spawn_point.y, 0.0),
+            let enemy_entity = commands
+                .spawn((
+                    Enemy,
+                    Mesh2d(shape),
+                    MeshMaterial2d(materials.add(color)),
+                    Transform::from_xyz(spawn_point.x, spawn_point.y, 0.0),
+                ))
+                .id();
+
+            let text_entity = commands
+                .entity(enemy_entity)
+                .with_child((Text::default(), Transform::from_xyz(-30.0, -60.0, 0.0)))
+                .id();
+            commands.entity(text_entity).with_child((
+                EnemyHealthText,
+                TextSpan::new("100%"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(YELLOW.into()),
             ));
         }
     }
