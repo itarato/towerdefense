@@ -3,7 +3,6 @@ mod math;
 use crate::math::{calculate_next_position_on_path, path_completed};
 use bevy::{
     color::palettes::css::{RED, YELLOW},
-    core_pipeline::core_3d::Transmissive3d,
     prelude::*,
 };
 use rand::prelude::*;
@@ -41,6 +40,22 @@ struct Bullet;
 
 #[derive(Component)]
 struct LifeSpan(f32);
+
+#[derive(Component)]
+struct Health {
+    max: u32,
+    current: u32,
+}
+
+impl Health {
+    fn new(max: u32) -> Self {
+        Self { max, current: max }
+    }
+
+    fn percentage(&self) -> f32 {
+        self.current as f32 / self.max as f32
+    }
+}
 
 fn setup(
     mut commands: Commands,
@@ -119,28 +134,24 @@ fn update_enemy_spawns(
 
         for shape in shapes.into_iter() {
             let color = Color::Srgba(Srgba::new(0.2, 0.8, 0.6, 1.0));
-            let enemy_entity = commands
+            commands
                 .spawn((
                     Enemy,
+                    Health::new(100),
                     Mesh2d(shape),
                     MeshMaterial2d(materials.add(color)),
                     Transform::from_xyz(spawn_point.x, spawn_point.y, 0.0),
                 ))
-                .id();
-
-            let text_entity = commands
-                .entity(enemy_entity)
-                .with_child((Text::default(), Transform::from_xyz(-30.0, -60.0, 0.0)))
-                .id();
-            commands.entity(text_entity).with_child((
-                EnemyHealthText,
-                TextSpan::new("100%"),
-                TextFont {
-                    font_size: 12.0,
-                    ..default()
-                },
-                TextColor(YELLOW.into()),
-            ));
+                .with_child((
+                    Text2d::new("100%"),
+                    TextFont {
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(YELLOW.into()),
+                    Transform::from_xyz(-30.0, -60.0, 0.0),
+                    EnemyHealthText,
+                ));
         }
     }
 }
@@ -148,7 +159,7 @@ fn update_enemy_spawns(
 fn update_shooting(
     mut commands: Commands,
     towers: Query<&Transform, With<Tower>>,
-    enemies: Query<(Entity, &Transform), With<Enemy>>,
+    enemies: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
     time: Res<Time>,
     mut shooting_timer: ResMut<ShootingTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -159,19 +170,23 @@ fn update_shooting(
     }
 
     let mut rng = rand::rng();
-    let enemies_vec = enemies.iter().collect::<Vec<_>>();
+    let mut enemies_vec = enemies.into_iter().collect::<Vec<_>>();
 
     if enemies_vec.is_empty() {
         return;
     }
 
     if let Some(tower_transform) = towers.iter().next() {
-        let random_enemy = enemies_vec[rng.random_range(0..enemies_vec.len())];
-        let enemy_transform = random_enemy.1;
+        let random_index = 0..enemies_vec.len();
+        let random_enemy = enemies_vec.get_mut(rng.random_range(random_index)).unwrap();
+
+        random_enemy.2.current -= 25;
+        // commands.entity(random_enemy.0).f
+        // *random_enemy.1 = Text2d::new("No");
 
         let line_handle = meshes.add(Segment2d::new(
             Vec2::default(),
-            enemy_transform.translation.xy() - tower_transform.translation.xy(),
+            random_enemy.1.translation.xy() - tower_transform.translation.xy(),
         ));
         commands.spawn((
             Bullet,
