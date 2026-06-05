@@ -55,6 +55,10 @@ impl Health {
     fn percentage(&self) -> f32 {
         self.current as f32 / self.max as f32
     }
+
+    fn is_dead(&self) -> bool {
+        self.current <= 0
+    }
 }
 
 fn setup(
@@ -124,11 +128,11 @@ fn update_enemy_spawns(
     mut commands: Commands,
     time: Res<Time>,
     game_map: Res<GameMap>,
-    mut tower_spawn_timer: ResMut<TowerSpawnTimer>,
+    mut enemy_spawn_timer: ResMut<TowerSpawnTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if tower_spawn_timer.0.tick(time.delta()).just_finished() {
+    if enemy_spawn_timer.0.tick(time.delta()).just_finished() {
         let shapes = [meshes.add(Circle::new(32.0))];
         let spawn_point = game_map.path[0];
 
@@ -159,7 +163,8 @@ fn update_enemy_spawns(
 fn update_shooting(
     mut commands: Commands,
     towers: Query<&Transform, With<Tower>>,
-    enemies: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
+    enemies: Query<(Entity, &Transform, &mut Health, &Children), With<Enemy>>,
+    mut enemy_health_text: Query<&mut Text2d>,
     time: Res<Time>,
     mut shooting_timer: ResMut<ShootingTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -181,8 +186,10 @@ fn update_shooting(
         let random_enemy = enemies_vec.get_mut(rng.random_range(random_index)).unwrap();
 
         random_enemy.2.current -= 25;
-        // commands.entity(random_enemy.0).f
-        // *random_enemy.1 = Text2d::new("No");
+        for enemy_child in random_enemy.3 {
+            let mut text = enemy_health_text.get_mut(*enemy_child).unwrap();
+            *text = Text2d::new(format!("{:.1?}%", random_enemy.2.percentage() * 100.0));
+        }
 
         let line_handle = meshes.add(Segment2d::new(
             Vec2::default(),
@@ -190,7 +197,7 @@ fn update_shooting(
         ));
         commands.spawn((
             Bullet,
-            LifeSpan(0.3),
+            LifeSpan(0.2),
             Mesh2d(line_handle),
             MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.8, 0.2, 0.1, 1.0)))),
             Transform::from_xyz(
@@ -221,6 +228,14 @@ fn update_life_span(
     }
 }
 
+fn update_health(mut commands: Commands, query: Query<(Entity, &Health)>) {
+    for (entity, health) in &query {
+        if health.is_dead() {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
 struct GamePlugin;
 
 impl Plugin for GamePlugin {
@@ -239,7 +254,7 @@ impl Plugin for GamePlugin {
                 TimerMode::Repeating,
             )))
             .insert_resource(ShootingTimer(Timer::from_seconds(
-                1.0,
+                0.5,
                 TimerMode::Repeating,
             )))
             .add_systems(Startup, setup)
@@ -251,6 +266,7 @@ impl Plugin for GamePlugin {
                     update_shooting,
                     update_life_span,
                     update_score,
+                    update_health,
                 )
                     .chain(),
             );
