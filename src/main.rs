@@ -1,14 +1,14 @@
+mod deletable;
 mod dragged;
 mod health;
 mod math;
+mod tower;
+mod util;
 
-use crate::{
-    dragged::{Dragged, update_move_dragged_objects},
-    health::{Health, update_health},
-    math::{calculate_next_position_on_path, path_completed},
-};
+use crate::{deletable::update_deletables, dragged::*, health::*, math::*, tower::*, util::*};
 use bevy::{
-    color::palettes::css::{RED, YELLOW},
+    color::palettes::css::{RED, WHITE, YELLOW},
+    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     input::{ButtonState, mouse::MouseButtonInput},
     prelude::*,
 };
@@ -16,9 +16,6 @@ use rand::prelude::*;
 
 const WIN_W: u32 = 1024;
 const WIN_H: u32 = 768;
-
-#[derive(Component)]
-struct Bounds(Rect);
 
 #[derive(Resource)]
 struct GameState {
@@ -31,16 +28,10 @@ struct GameMap {
 }
 
 #[derive(Component)]
-struct Tower;
-
-#[derive(Component)]
 struct Enemy;
 
 #[derive(Resource)]
-struct TowerSpawnTimer(Timer);
-
-#[derive(Resource)]
-struct ShootingTimer(Timer);
+struct EnemySpawnTimer(Timer);
 
 #[derive(Component)]
 struct ScoreText;
@@ -52,13 +43,7 @@ struct EnemyHealthText;
 struct Bullet;
 
 #[derive(Component)]
-struct LifeSpan(f32);
-
-#[derive(Component)]
-struct TowerKind;
-
-#[derive(Component)]
-struct TowerCandidate;
+struct FpsText;
 
 fn setup(
     mut commands: Commands,
@@ -78,44 +63,54 @@ fn setup(
             },
         ))
         .with_child((
+            ScoreText,
             TextSpan::default(),
             TextFont {
                 font_size: 24.0,
                 ..default()
             },
             TextColor(RED.into()),
-            ScoreText,
         ));
 
-    let mesh_handle = meshes.add(Circle::new(48.0));
-    let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
-    commands.spawn((
-        Tower,
-        Mesh2d(mesh_handle),
-        MeshMaterial2d(materials.add(color)),
-        Transform::from_xyz(-100.0, 200.0, 0.0),
-    ));
+    commands
+        .spawn((
+            Text::new("FPS: "),
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(140.0),
+                top: Val::Px(10.0),
+                ..default()
+            },
+        ))
+        .with_child((
+            FpsText,
+            TextSpan::default(),
+            TextFont {
+                font_size: 24.0,
+                ..default()
+            },
+            TextColor(WHITE.into()),
+        ));
 
     // Spawnable towers:
     let tower_kind_width = 64.0;
     let tower_kind_height = 32.0;
-    let tower_kind_handles = [meshes.add(Rectangle::new(tower_kind_width, tower_kind_height))];
-    for mesh_handle in tower_kind_handles.into_iter() {
-        let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
+    for (i, tower_spec) in TOWER_SPECS.iter().enumerate() {
+        let tower_kind_handle = meshes.add(Rectangle::new(tower_kind_width, tower_kind_height));
         let bound_rect = Rect {
             min: Vec2 {
                 x: -(WIN_W as f32) / 2.0,
-                y: 200.0,
+                y: 200.0 + i as f32 * 48.0,
             },
             max: Vec2 {
                 x: -(WIN_W as f32) / 2.0 + tower_kind_width,
-                y: 200.0 + tower_kind_height,
+                y: 200.0 + i as f32 * 48.0 + tower_kind_height,
             },
         };
         commands.spawn((
-            TowerKind,
-            Mesh2d(mesh_handle),
-            MeshMaterial2d(materials.add(color)),
+            TowerKind(i as u8),
+            Mesh2d(tower_kind_handle),
+            MeshMaterial2d(materials.add(tower_spec.color)),
             Transform::from_xyz(
                 bound_rect.min.x + tower_kind_width / 2.0,
                 bound_rect.min.y + tower_kind_height / 2.0,
@@ -153,7 +148,7 @@ fn update_enemy_spawns(
     mut commands: Commands,
     time: Res<Time>,
     game_map: Res<GameMap>,
-    mut enemy_spawn_timer: ResMut<TowerSpawnTimer>,
+    mut enemy_spawn_timer: ResMut<EnemySpawnTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -187,7 +182,7 @@ fn update_enemy_spawns(
 
 fn update_shooting(
     mut commands: Commands,
-    towers: Query<&Transform, With<Tower>>,
+    towers: Query<(&Transform, &Tower), With<Tower>>,
     enemies: Query<(Entity, &Transform, &mut Health, &Children), With<Enemy>>,
     mut enemy_health_text: Query<&mut Text2d>,
     time: Res<Time>,
@@ -195,8 +190,8 @@ fn update_shooting(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if !shooting_timer.0.tick(time.delta()).just_finished() {
-        return;
+    for timer in &mut shooting_timer.0 {
+        timer.tick(time.delta());
     }
 
     let mut rng = rand::rng();
@@ -206,7 +201,11 @@ fn update_shooting(
         return;
     }
 
-    if let Some(tower_transform) = towers.iter().next() {
+    for (tower_transform, tower) in towers {
+        if !shooting_timer.0[tower.0 as usize].just_finished() {
+            continue;
+        }
+
         let random_index = 0..enemies_vec.len();
         let random_enemy = enemies_vec.get_mut(rng.random_range(random_index)).unwrap();
 
@@ -240,22 +239,9 @@ fn update_score(mut query: Query<&mut TextSpan, With<ScoreText>>, game_state: Re
     }
 }
 
-fn update_life_span(
-    mut commands: Commands,
-    mut query: Query<(Entity, &mut LifeSpan)>,
-    time: Res<Time>,
-) {
-    for (entity, mut life_span) in &mut query {
-        life_span.0 -= time.delta().as_secs_f32();
-        if life_span.0 <= 0.0 {
-            commands.entity(entity).despawn();
-        }
-    }
-}
-
 fn update_detect_tower_picking(
     mut commands: Commands,
-    selectable_towers: Query<&Bounds, With<TowerKind>>,
+    selectable_towers: Query<(&Bounds, &TowerKind), With<TowerKind>>,
     mut mouse_event: MessageReader<MouseButtonInput>,
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform)>,
@@ -266,7 +252,7 @@ fn update_detect_tower_picking(
         if mouse_button_input.button == MouseButton::Left
             && mouse_button_input.state == ButtonState::Pressed
         {
-            for selectable_tower_bound in selectable_towers {
+            for (selectable_tower_bound, tower_kind) in selectable_towers {
                 if let Some(cursor_pos) = window.cursor_position() {
                     let (cam, cam_transform) = *camera;
                     let cursor_world_pos =
@@ -274,12 +260,11 @@ fn update_detect_tower_picking(
 
                     if selectable_tower_bound.0.contains(cursor_world_pos) {
                         let mesh_handle = meshes.add(Circle::new(48.0));
-                        let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
                         commands.spawn((
-                            TowerCandidate,
+                            TowerCandidate(tower_kind.0),
                             Dragged,
                             Mesh2d(mesh_handle),
-                            MeshMaterial2d(materials.add(color)),
+                            MeshMaterial2d(materials.add(TOWER_SPECS[tower_kind.0 as usize].color)),
                             Transform::from_xyz(cursor_world_pos.x, cursor_world_pos.y, 0.0),
                         ));
                     }
@@ -291,12 +276,40 @@ fn update_detect_tower_picking(
 
 fn update_drop_tower(
     mut commands: Commands,
-    candidate: Single<Entity, With<TowerCandidate>>,
+    candidate: Single<(Entity, &TowerCandidate), With<TowerCandidate>>,
     mut mouse_event_reader: MessageReader<MouseButtonInput>,
+    window: Single<&Window>,
+    camera: Single<(&Camera, &GlobalTransform)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     for event in mouse_event_reader.read() {
         if event.button == MouseButton::Left && event.state == ButtonState::Released {
-            commands.entity(*candidate).despawn();
+            let cursor_pos = window.cursor_position().unwrap();
+            let (cam, cam_transform) = *camera;
+            let cursor_world_pos = cam.viewport_to_world_2d(cam_transform, cursor_pos).unwrap();
+            let (candidate_entity, candidate) = *candidate;
+            commands.entity(candidate_entity).despawn();
+            spawn_tower(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                cursor_world_pos,
+                candidate.0,
+            );
+        }
+    }
+}
+
+fn update_fps_text(
+    diagnostics: Res<DiagnosticsStore>,
+    mut query: Query<&mut TextSpan, With<FpsText>>,
+) {
+    for mut span in &mut query {
+        if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS)
+            && let Some(value) = fps.smoothed()
+        {
+            **span = format!("{value:.2}");
         }
     }
 }
@@ -305,6 +318,11 @@ struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
+        let shooting_timers = TOWER_SPECS
+            .iter()
+            .map(|spec| Timer::from_seconds(spec.shooting_freq_secs, TimerMode::Repeating))
+            .collect();
+
         app.insert_resource(GameState { base_life: 100 })
             .insert_resource(GameMap {
                 path: vec![
@@ -314,14 +332,11 @@ impl Plugin for GamePlugin {
                     (200.0, 200.0).into(),
                 ],
             })
-            .insert_resource(TowerSpawnTimer(Timer::from_seconds(
-                1.0,
+            .insert_resource(EnemySpawnTimer(Timer::from_seconds(
+                0.1,
                 TimerMode::Repeating,
             )))
-            .insert_resource(ShootingTimer(Timer::from_seconds(
-                0.5,
-                TimerMode::Repeating,
-            )))
+            .insert_resource(ShootingTimer(shooting_timers))
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
@@ -338,6 +353,8 @@ impl Plugin for GamePlugin {
                     update_detect_tower_picking,
                     update_move_dragged_objects,
                     update_drop_tower,
+                    update_fps_text,
+                    update_deletables,
                 ),
             );
     }
@@ -345,14 +362,17 @@ impl Plugin for GamePlugin {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                resolution: (WIN_W, WIN_H).into(),
-                title: "Tower Defense".into(),
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: (WIN_W, WIN_H).into(),
+                    title: "Tower Defense".into(),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
-            ..Default::default()
-        }))
+            FrameTimeDiagnosticsPlugin::default(),
+        ))
         .add_plugins(GamePlugin)
         .run();
 }

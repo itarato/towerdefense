@@ -2,12 +2,12 @@ use bevy::prelude::*;
 
 #[derive(Component)]
 pub(crate) struct Health {
-    max: u32,
-    pub(crate) current: u32,
+    max: i32,
+    pub(crate) current: i32,
 }
 
 impl Health {
-    pub(crate) fn new(max: u32) -> Self {
+    pub(crate) fn new(max: i32) -> Self {
         Self { max, current: max }
     }
 
