@@ -1,11 +1,24 @@
+mod dragged;
+mod health;
 mod math;
 
-use crate::math::{calculate_next_position_on_path, path_completed};
+use crate::{
+    dragged::{Dragged, update_move_dragged_objects},
+    health::{Health, update_health},
+    math::{calculate_next_position_on_path, path_completed},
+};
 use bevy::{
     color::palettes::css::{RED, YELLOW},
+    input::{ButtonState, mouse::MouseButtonInput},
     prelude::*,
 };
 use rand::prelude::*;
+
+const WIN_W: u32 = 1024;
+const WIN_H: u32 = 768;
+
+#[derive(Component)]
+struct Bounds(Rect);
 
 #[derive(Resource)]
 struct GameState {
@@ -42,24 +55,10 @@ struct Bullet;
 struct LifeSpan(f32);
 
 #[derive(Component)]
-struct Health {
-    max: u32,
-    current: u32,
-}
+struct TowerKind;
 
-impl Health {
-    fn new(max: u32) -> Self {
-        Self { max, current: max }
-    }
-
-    fn percentage(&self) -> f32 {
-        self.current as f32 / self.max as f32
-    }
-
-    fn is_dead(&self) -> bool {
-        self.current <= 0
-    }
-}
+#[derive(Component)]
+struct TowerCandidate;
 
 fn setup(
     mut commands: Commands,
@@ -88,15 +87,41 @@ fn setup(
             ScoreText,
         ));
 
-    let mesh_handles = [meshes.add(Circle::new(48.0))];
+    let mesh_handle = meshes.add(Circle::new(48.0));
+    let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
+    commands.spawn((
+        Tower,
+        Mesh2d(mesh_handle),
+        MeshMaterial2d(materials.add(color)),
+        Transform::from_xyz(-100.0, 200.0, 0.0),
+    ));
 
-    for mesh_handle in mesh_handles.into_iter() {
+    // Spawnable towers:
+    let tower_kind_width = 64.0;
+    let tower_kind_height = 32.0;
+    let tower_kind_handles = [meshes.add(Rectangle::new(tower_kind_width, tower_kind_height))];
+    for mesh_handle in tower_kind_handles.into_iter() {
         let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
+        let bound_rect = Rect {
+            min: Vec2 {
+                x: -(WIN_W as f32) / 2.0,
+                y: 200.0,
+            },
+            max: Vec2 {
+                x: -(WIN_W as f32) / 2.0 + tower_kind_width,
+                y: 200.0 + tower_kind_height,
+            },
+        };
         commands.spawn((
-            Tower,
+            TowerKind,
             Mesh2d(mesh_handle),
             MeshMaterial2d(materials.add(color)),
-            Transform::from_xyz(-100.0, 200.0, 0.0),
+            Transform::from_xyz(
+                bound_rect.min.x + tower_kind_width / 2.0,
+                bound_rect.min.y + tower_kind_height / 2.0,
+                0.0,
+            ),
+            Bounds(bound_rect),
         ));
     }
 }
@@ -228,10 +253,50 @@ fn update_life_span(
     }
 }
 
-fn update_health(mut commands: Commands, query: Query<(Entity, &Health)>) {
-    for (entity, health) in &query {
-        if health.is_dead() {
-            commands.entity(entity).despawn();
+fn update_detect_tower_picking(
+    mut commands: Commands,
+    selectable_towers: Query<&Bounds, With<TowerKind>>,
+    mut mouse_event: MessageReader<MouseButtonInput>,
+    window: Single<&Window>,
+    camera: Single<(&Camera, &GlobalTransform)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    for mouse_button_input in mouse_event.read() {
+        if mouse_button_input.button == MouseButton::Left
+            && mouse_button_input.state == ButtonState::Pressed
+        {
+            for selectable_tower_bound in selectable_towers {
+                if let Some(cursor_pos) = window.cursor_position() {
+                    let (cam, cam_transform) = *camera;
+                    let cursor_world_pos =
+                        cam.viewport_to_world_2d(cam_transform, cursor_pos).unwrap();
+
+                    if selectable_tower_bound.0.contains(cursor_world_pos) {
+                        let mesh_handle = meshes.add(Circle::new(48.0));
+                        let color = Color::Srgba(Srgba::new(0.8, 0.2, 0.6, 1.0));
+                        commands.spawn((
+                            TowerCandidate,
+                            Dragged,
+                            Mesh2d(mesh_handle),
+                            MeshMaterial2d(materials.add(color)),
+                            Transform::from_xyz(cursor_world_pos.x, cursor_world_pos.y, 0.0),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn update_drop_tower(
+    mut commands: Commands,
+    candidate: Single<Entity, With<TowerCandidate>>,
+    mut mouse_event_reader: MessageReader<MouseButtonInput>,
+) {
+    for event in mouse_event_reader.read() {
+        if event.button == MouseButton::Left && event.state == ButtonState::Released {
+            commands.entity(*candidate).despawn();
         }
     }
 }
@@ -261,14 +326,19 @@ impl Plugin for GamePlugin {
             .add_systems(
                 Update,
                 (
-                    update_enemy_spawns,
-                    update_enemy_movement,
-                    update_shooting,
-                    update_life_span,
+                    (
+                        update_enemy_spawns,
+                        update_enemy_movement,
+                        update_shooting,
+                        update_life_span,
+                        update_health,
+                    )
+                        .chain(),
                     update_score,
-                    update_health,
-                )
-                    .chain(),
+                    update_detect_tower_picking,
+                    update_move_dragged_objects,
+                    update_drop_tower,
+                ),
             );
     }
 }
@@ -277,7 +347,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (1024, 768).into(),
+                resolution: (WIN_W, WIN_H).into(),
                 title: "Tower Defense".into(),
                 ..Default::default()
             }),
