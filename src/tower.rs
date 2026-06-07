@@ -66,12 +66,24 @@ pub(crate) fn spawn_tower(
     kind: u8,
 ) {
     let mesh_handle = meshes.add(Circle::new(TOWER_SIZE_RADIUS));
-    commands.spawn((
-        Tower(kind),
-        Mesh2d(mesh_handle),
-        MeshMaterial2d(materials.add(TOWER_SPECS[kind as usize].color)),
-        Transform::from_xyz(pos.x, pos.y, 0.0),
-        Deletable,
-        Bounds(TOWER_SPECS[kind as usize].bounds_rect_at_pos(pos)),
-    ));
+    let reach_mesh_handle = meshes.add(Circle::new(TOWER_SPECS[kind as usize].distance));
+    commands
+        .spawn((
+            Tower(kind),
+            Mesh2d(mesh_handle),
+            MeshMaterial2d(materials.add(TOWER_SPECS[kind as usize].color)),
+            Transform::from_xyz(pos.x, pos.y, 0.0),
+            Deletable,
+            Bounds(TOWER_SPECS[kind as usize].bounds_rect_at_pos(pos)),
+        ))
+        .with_child((
+            Mesh2d(reach_mesh_handle),
+            MeshMaterial2d(materials.add(Color::Srgba(Srgba {
+                red: 1.0,
+                green: 1.0,
+                blue: 1.0,
+                alpha: 0.05,
+            }))),
+            Transform::from_xyz(0.0, 0.0, -1.0),
+        ));
 }

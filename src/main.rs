@@ -289,8 +289,9 @@ fn update_detect_tower_picking(
                                     red: 1.0,
                                     green: 1.0,
                                     blue: 1.0,
-                                    alpha: 0.2,
+                                    alpha: 0.15,
                                 }))),
+                                Transform::from_xyz(0.0, 0.0, -1.0),
                             ));
                     }
                 }
