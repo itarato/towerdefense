@@ -6,19 +6,19 @@ pub(crate) const TOWER_SIZE_RADIUS: f32 = 32.0;
 pub(crate) const TOWER_SPECS: [TowerSpecs; 3] = [
     TowerSpecs {
         distance: 100.0,
-        damage: 10.0,
+        damage: 10,
         shooting_freq_secs: 0.1,
         color: Color::Srgba(Srgba::new(0.2, 0.4, 0.6, 1.0)),
     },
     TowerSpecs {
         distance: 200.0,
-        damage: 50.0,
+        damage: 50,
         shooting_freq_secs: 0.6,
         color: Color::Srgba(Srgba::new(0.4, 0.2, 0.6, 1.0)),
     },
     TowerSpecs {
         distance: 300.0,
-        damage: 80.0,
+        damage: 80,
         shooting_freq_secs: 1.2,
         color: Color::Srgba(Srgba::new(0.6, 0.2, 0.4, 1.0)),
     },
@@ -26,7 +26,7 @@ pub(crate) const TOWER_SPECS: [TowerSpecs; 3] = [
 
 pub(crate) struct TowerSpecs {
     pub(crate) distance: f32,
-    pub(crate) damage: f32,
+    pub(crate) damage: i32,
     pub(crate) shooting_freq_secs: f32,
     pub(crate) color: Color,
 }

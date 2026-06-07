@@ -183,7 +183,7 @@ fn update_enemy_spawns(
 fn update_shooting(
     mut commands: Commands,
     towers: Query<(&Transform, &Tower), With<Tower>>,
-    enemies: Query<(Entity, &Transform, &mut Health, &Children), With<Enemy>>,
+    mut enemies: Query<(Entity, &Transform, &mut Health, &Children), With<Enemy>>,
     mut enemy_health_text: Query<&mut Text2d>,
     time: Res<Time>,
     mut shooting_timer: ResMut<ShootingTimer>,
@@ -195,21 +195,32 @@ fn update_shooting(
     }
 
     let mut rng = rand::rng();
-    let mut enemies_vec = enemies.into_iter().collect::<Vec<_>>();
-
-    if enemies_vec.is_empty() {
-        return;
-    }
-
     for (tower_transform, tower) in towers {
         if !shooting_timer.0[tower.0 as usize].just_finished() {
             continue;
         }
 
-        let random_index = 0..enemies_vec.len();
-        let random_enemy = enemies_vec.get_mut(rng.random_range(random_index)).unwrap();
+        let mut reachable_enemy = enemies
+            .iter_mut()
+            .filter(|(_, transform, _, _)| {
+                transform
+                    .translation
+                    .xy()
+                    .distance(tower_transform.translation.xy())
+                    <= TOWER_SPECS[tower.0 as usize].distance
+            })
+            .collect::<Vec<_>>();
 
-        random_enemy.2.current -= 25;
+        if reachable_enemy.is_empty() {
+            continue;
+        }
+
+        let random_index = 0..reachable_enemy.len();
+        let random_enemy = reachable_enemy
+            .get_mut(rng.random_range(random_index))
+            .unwrap();
+
+        random_enemy.2.current -= TOWER_SPECS[tower.0 as usize].damage;
         for enemy_child in random_enemy.3 {
             let mut text = enemy_health_text.get_mut(*enemy_child).unwrap();
             *text = Text2d::new(format!("{:.1?}%", random_enemy.2.percentage() * 100.0));
@@ -333,7 +344,7 @@ impl Plugin for GamePlugin {
                 ],
             })
             .insert_resource(EnemySpawnTimer(Timer::from_seconds(
-                0.1,
+                1.0,
                 TimerMode::Repeating,
             )))
             .insert_resource(ShootingTimer(shooting_timers))
