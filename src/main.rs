@@ -271,13 +271,27 @@ fn update_detect_tower_picking(
 
                     if selectable_tower_bound.0.contains(cursor_world_pos) {
                         let mesh_handle = meshes.add(Circle::new(48.0));
-                        commands.spawn((
-                            TowerCandidate(tower_kind.0),
-                            Dragged,
-                            Mesh2d(mesh_handle),
-                            MeshMaterial2d(materials.add(TOWER_SPECS[tower_kind.0 as usize].color)),
-                            Transform::from_xyz(cursor_world_pos.x, cursor_world_pos.y, 0.0),
-                        ));
+                        let reach_mesh_handle =
+                            meshes.add(Circle::new(TOWER_SPECS[tower_kind.0 as usize].distance));
+                        commands
+                            .spawn((
+                                TowerCandidate(tower_kind.0),
+                                Dragged,
+                                Mesh2d(mesh_handle),
+                                MeshMaterial2d(
+                                    materials.add(TOWER_SPECS[tower_kind.0 as usize].color),
+                                ),
+                                Transform::from_xyz(cursor_world_pos.x, cursor_world_pos.y, 0.0),
+                            ))
+                            .with_child((
+                                Mesh2d(reach_mesh_handle),
+                                MeshMaterial2d(materials.add(Color::Srgba(Srgba {
+                                    red: 1.0,
+                                    green: 1.0,
+                                    blue: 1.0,
+                                    alpha: 0.2,
+                                }))),
+                            ));
                     }
                 }
             }
