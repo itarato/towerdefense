@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{deletable::Deletable, util::Bounds};
 
-pub(crate) const TOWER_SIZE_RADIUS: f32 = 32.0;
+pub(crate) const TOWER_SIZE_RADIUS: f32 = 8.0;
 pub(crate) const TOWER_SPECS: [TowerSpecs; 3] = [
     TowerSpecs {
         distance: 100.0,
@@ -82,7 +82,7 @@ pub(crate) fn spawn_tower(
                 red: 1.0,
                 green: 1.0,
                 blue: 1.0,
-                alpha: 0.05,
+                alpha: 0.01,
             }))),
             Transform::from_xyz(0.0, 0.0, -1.0),
         ));

@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 
+pub(crate) const WIN_W: u32 = 1024;
+pub(crate) const WIN_H: u32 = 768;
+
 #[derive(Component)]
 pub(crate) struct Bounds(pub(crate) Rect);
 
