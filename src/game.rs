@@ -2,7 +2,7 @@ use crate::{
     deletable::update_deletables, dragged::*, enemy::*, health::*, math::*, tower::*, util::*,
 };
 use bevy::{
-    color::palettes::css::{RED, WHITE},
+    color::palettes::css::{BLUE, RED, WHITE},
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     input::{ButtonState, mouse::MouseButtonInput},
     prelude::*,
@@ -33,9 +33,11 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    game_map: Res<GameMap>,
 ) {
     commands.spawn(Camera2d);
 
+    // Score text.
     commands
         .spawn((
             Text::default(),
@@ -56,6 +58,7 @@ fn setup(
             TextColor(RED.into()),
         ));
 
+    // FPS text;
     commands
         .spawn((
             Text::new("FPS: "),
@@ -76,7 +79,7 @@ fn setup(
             TextColor(WHITE.into()),
         ));
 
-    // Spawnable towers:
+    // Tower pickers:
     let tower_kind_width = 64.0;
     let tower_kind_height = 32.0;
     for (i, tower_spec) in TOWER_SPECS.iter().enumerate() {
@@ -103,6 +106,14 @@ fn setup(
             Bounds(bound_rect),
         ));
     }
+
+    // Path.
+    let path_shape = meshes.add(Polyline2d::new(game_map.path.clone()));
+    commands.spawn((
+        Mesh2d(path_shape),
+        MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)))),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+    ));
 }
 
 fn update_enemy_movement(
