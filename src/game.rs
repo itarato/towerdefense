@@ -12,6 +12,7 @@ use rand::prelude::*;
 #[derive(Resource)]
 struct GameState {
     base_life: i32,
+    waves: Waves,
 }
 
 #[derive(Resource)]
@@ -323,6 +324,13 @@ fn update_fps_text(
     }
 }
 
+fn update_game_state(mut game_state: ResMut<GameState>, time: Res<Time>) {
+    let spawn_kinds = game_state.waves.update(time.delta());
+    if !spawn_kinds.is_empty() {
+        println!("Spawn: {:?}", spawn_kinds);
+    }
+}
+
 pub(crate) struct GamePlugin;
 
 impl Plugin for GamePlugin {
@@ -332,39 +340,43 @@ impl Plugin for GamePlugin {
             .map(|spec| Timer::from_seconds(spec.shooting_freq_secs, TimerMode::Repeating))
             .collect();
 
-        app.insert_resource(GameState { base_life: 100 })
-            .insert_resource(GameMap {
-                path: vec![
-                    (-200.0, -200.0).into(),
-                    (-200.0, 0.0).into(),
-                    (200.0, 0.0).into(),
-                    (200.0, 200.0).into(),
-                ],
-            })
-            .insert_resource(EnemySpawnTimer(Timer::from_seconds(
-                1.0,
-                TimerMode::Repeating,
-            )))
-            .insert_resource(ShootingTimer(shooting_timers))
-            .add_systems(Startup, setup)
-            .add_systems(
-                Update,
+        app.insert_resource(GameState {
+            base_life: 100,
+            waves: Waves::load(),
+        })
+        .insert_resource(GameMap {
+            path: vec![
+                (-200.0, -200.0).into(),
+                (-200.0, 0.0).into(),
+                (200.0, 0.0).into(),
+                (200.0, 200.0).into(),
+            ],
+        })
+        .insert_resource(EnemySpawnTimer(Timer::from_seconds(
+            1.0,
+            TimerMode::Repeating,
+        )))
+        .insert_resource(ShootingTimer(shooting_timers))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
                 (
-                    (
-                        update_enemy_spawns,
-                        update_enemy_movement,
-                        update_shooting,
-                        update_life_span,
-                        update_health,
-                    )
-                        .chain(),
-                    update_score,
-                    update_detect_tower_picking,
-                    update_move_dragged_objects,
-                    update_drop_tower,
-                    update_fps_text,
-                    update_deletables,
-                ),
-            );
+                    update_enemy_spawns,
+                    update_enemy_movement,
+                    update_shooting,
+                    update_life_span,
+                    update_health,
+                )
+                    .chain(),
+                update_score,
+                update_detect_tower_picking,
+                update_move_dragged_objects,
+                update_drop_tower,
+                update_fps_text,
+                update_deletables,
+                update_game_state,
+            ),
+        );
     }
 }
