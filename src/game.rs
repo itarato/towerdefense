@@ -107,12 +107,12 @@ fn setup(
 
 fn update_enemy_movement(
     mut commands: Commands,
-    mut query: Query<(Entity, &mut Transform), With<Enemy>>,
+    mut query: Query<(Entity, &mut Transform, &Enemy), With<Enemy>>,
     time: Res<Time>,
     game_map: Res<GameMap>,
     mut game_state: ResMut<GameState>,
 ) {
-    for (entity, mut transform) in &mut query {
+    for (entity, mut transform, enemy) in &mut query {
         if path_completed(&transform.translation.xy(), &game_map.path) {
             commands.entity(entity).despawn();
             game_state.base_life -= 5;
@@ -120,46 +120,10 @@ fn update_enemy_movement(
             let next_pos = calculate_next_position_on_path(
                 &transform.translation.xy(),
                 &game_map.path,
-                100.0 * time.delta_secs(),
+                ENEMY_SPECS[enemy.0 as usize].speed * time.delta_secs(),
             );
             transform.translation.x = next_pos.x;
             transform.translation.y = next_pos.y;
-        }
-    }
-}
-
-fn update_enemy_spawns(
-    mut commands: Commands,
-    time: Res<Time>,
-    game_map: Res<GameMap>,
-    mut enemy_spawn_timer: ResMut<EnemySpawnTimer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    if enemy_spawn_timer.0.tick(time.delta()).just_finished() {
-        let shapes = [meshes.add(Circle::new(ENEMY_SIZE_RADIUS))];
-        let spawn_point = game_map.path[0];
-
-        for shape in shapes.into_iter() {
-            let color = Color::Srgba(Srgba::new(0.2, 0.8, 0.6, 1.0));
-            commands
-                .spawn((
-                    Enemy,
-                    Health::new(100),
-                    Mesh2d(shape),
-                    MeshMaterial2d(materials.add(color)),
-                    Transform::from_xyz(spawn_point.x, spawn_point.y, 0.0),
-                ))
-                .with_child((
-                    Text2d::new("100%"),
-                    TextFont {
-                        font_size: 12.0,
-                        ..default()
-                    },
-                    TextColor(WHITE.into()),
-                    Transform::from_xyz(0.0, -16.0, 0.0),
-                    EnemyHealthText,
-                ));
         }
     }
 }
@@ -324,10 +288,23 @@ fn update_fps_text(
     }
 }
 
-fn update_game_state(mut game_state: ResMut<GameState>, time: Res<Time>) {
+fn update_game_state(
+    mut commands: Commands,
+    mut game_state: ResMut<GameState>,
+    time: Res<Time>,
+    game_map: Res<GameMap>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
     let spawn_kinds = game_state.waves.update(time.delta());
-    if !spawn_kinds.is_empty() {
-        println!("Spawn: {:?}", spawn_kinds);
+    for spawn_kind in spawn_kinds {
+        spawn_enemy(
+            spawn_kind,
+            &mut commands,
+            game_map.path[0],
+            &mut meshes,
+            &mut materials,
+        );
     }
 }
 
@@ -352,17 +329,12 @@ impl Plugin for GamePlugin {
                 (200.0, 200.0).into(),
             ],
         })
-        .insert_resource(EnemySpawnTimer(Timer::from_seconds(
-            1.0,
-            TimerMode::Repeating,
-        )))
         .insert_resource(ShootingTimer(shooting_timers))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
                 (
-                    update_enemy_spawns,
                     update_enemy_movement,
                     update_shooting,
                     update_life_span,

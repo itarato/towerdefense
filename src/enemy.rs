@@ -1,8 +1,32 @@
+use crate::health::Health;
+use bevy::{color::palettes::css::WHITE, prelude::*};
 use std::time::Duration;
 
-use bevy::prelude::*;
-
 pub(crate) const ENEMY_SIZE_RADIUS: f32 = 8.0;
+
+pub(crate) const ENEMY_SPECS: [EnemySpecs; 3] = [
+    EnemySpecs {
+        speed: 120.0,
+        health: 40,
+        color: Color::Srgba(Srgba::new(0.3, 0.1, 0.9, 1.0)),
+    },
+    EnemySpecs {
+        speed: 80.0,
+        health: 100,
+        color: Color::Srgba(Srgba::new(0.1, 0.9, 0.3, 1.0)),
+    },
+    EnemySpecs {
+        speed: 50.0,
+        health: 200,
+        color: Color::Srgba(Srgba::new(0.9, 0.1, 0.3, 1.0)),
+    },
+];
+
+pub(crate) struct EnemySpecs {
+    pub(crate) speed: f32,
+    health: i32,
+    color: Color,
+}
 
 pub(crate) struct Burst {
     pub(crate) kind: u8,
@@ -130,11 +154,36 @@ impl Waves {
     }
 }
 
-#[derive(Component)]
-pub(crate) struct Enemy;
+pub(crate) fn spawn_enemy(
+    kind: u8,
+    commands: &mut Commands,
+    pos: Vec2,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
+) {
+    let shape = meshes.add(Circle::new(ENEMY_SIZE_RADIUS));
+    commands
+        .spawn((
+            Enemy(kind),
+            Health::new(ENEMY_SPECS[kind as usize].health),
+            Mesh2d(shape),
+            MeshMaterial2d(materials.add(ENEMY_SPECS[kind as usize].color)),
+            Transform::from_xyz(pos.x, pos.y, 0.0),
+        ))
+        .with_child((
+            Text2d::new("100%"),
+            TextFont {
+                font_size: 12.0,
+                ..default()
+            },
+            TextColor(WHITE.into()),
+            Transform::from_xyz(0.0, -16.0, 0.0),
+            EnemyHealthText,
+        ));
+}
 
-#[derive(Resource)]
-pub(crate) struct EnemySpawnTimer(pub(crate) Timer);
+#[derive(Component)]
+pub(crate) struct Enemy(pub(crate) u8);
 
 #[derive(Component)]
 pub(crate) struct EnemyHealthText;
