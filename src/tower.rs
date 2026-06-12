@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{deletable::Deletable, util::Bounds};
 
-pub(crate) const TOWER_SIZE_RADIUS: f32 = 8.0;
+pub(crate) const TOWER_SIZE_RADIUS: f32 = 12.0;
 pub(crate) const TOWER_SPECS: [TowerSpecs; 3] = [
     TowerSpecs {
         distance: 100.0,
@@ -65,12 +65,12 @@ pub(crate) fn spawn_tower(
     pos: Vec2,
     kind: u8,
 ) {
-    let mesh_handle = meshes.add(Circle::new(TOWER_SIZE_RADIUS));
     let reach_mesh_handle = meshes.add(Circle::new(TOWER_SPECS[kind as usize].distance));
+
     commands
         .spawn((
             Tower(kind),
-            Mesh2d(mesh_handle),
+            Mesh2d(meshes.add(RegularPolygon::new(TOWER_SIZE_RADIUS, kind as u32 + 3))),
             MeshMaterial2d(materials.add(TOWER_SPECS[kind as usize].color)),
             Transform::from_xyz(pos.x, pos.y, 0.0),
             Deletable,

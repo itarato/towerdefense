@@ -2,7 +2,7 @@ use crate::health::Health;
 use bevy::{color::palettes::css::WHITE, prelude::*};
 use std::time::Duration;
 
-pub(crate) const ENEMY_SIZE_RADIUS: f32 = 8.0;
+pub(crate) const ENEMY_SIZE_RADIUS: f32 = 12.0;
 
 pub(crate) const ENEMY_SPECS: [EnemySpecs; 3] = [
     EnemySpecs {
@@ -161,7 +161,7 @@ pub(crate) fn spawn_enemy(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
 ) {
-    let shape = meshes.add(Circle::new(ENEMY_SIZE_RADIUS));
+    let shape = meshes.add(RegularPolygon::new(ENEMY_SIZE_RADIUS, 6));
     commands
         .spawn((
             Enemy(kind),

@@ -1,8 +1,8 @@
 use crate::{
-    deletable::update_deletables, dragged::*, enemy::*, game, health::*, math::*, tower::*, util::*,
+    deletable::update_deletables, dragged::*, enemy::*, health::*, math::*, tower::*, util::*,
 };
 use bevy::{
-    color::palettes::css::{BLUE, RED, WHITE},
+    color::palettes::css::{GRAY, RED},
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     input::{ButtonState, mouse::MouseButtonInput},
     prelude::*,
@@ -61,22 +61,28 @@ fn setup(
     // FPS text;
     commands
         .spawn((
-            Text::new("FPS: "),
+            Text::new("FPS:"),
             Node {
                 position_type: PositionType::Absolute,
-                right: Val::Px(140.0),
+                right: Val::Px(10.0),
                 top: Val::Px(10.0),
                 ..default()
             },
+            TextSpan::default(),
+            TextFont {
+                font_size: 12.0,
+                ..default()
+            },
+            TextColor(GRAY.into()),
         ))
         .with_child((
             FpsText,
             TextSpan::default(),
             TextFont {
-                font_size: 24.0,
+                font_size: 12.0,
                 ..default()
             },
-            TextColor(WHITE.into()),
+            TextColor(GRAY.into()),
         ));
 
     // Tower pickers:
@@ -150,7 +156,7 @@ fn update_shooting(
     mut commands: Commands,
     towers: Query<(&Transform, &Tower), With<Tower>>,
     mut enemies: Query<(Entity, &Transform, &mut Health, &Children), With<Enemy>>,
-    mut enemy_health_text: Query<&mut Text2d>,
+    mut enemy_health_text: Query<&mut Text2d, With<EnemyHealthText>>,
     time: Res<Time>,
     mut shooting_timer: ResMut<ShootingTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -189,7 +195,7 @@ fn update_shooting(
         random_enemy.2.current -= TOWER_SPECS[tower.0 as usize].damage;
         for enemy_child in random_enemy.3 {
             let mut text = enemy_health_text.get_mut(*enemy_child).unwrap();
-            *text = Text2d::new(format!("{:.1?}%", random_enemy.2.percentage() * 100.0));
+            *text = Text2d::new(format!("{:.0?}%", random_enemy.2.percentage() * 100.0));
         }
 
         let line_handle = meshes.add(Segment2d::new(
@@ -301,7 +307,7 @@ fn update_fps_text(
         if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS)
             && let Some(value) = fps.smoothed()
         {
-            **span = format!("{value:.2}");
+            **span = format!("{value:.0}");
         }
     }
 }
