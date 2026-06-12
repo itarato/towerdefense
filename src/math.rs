@@ -2,7 +2,7 @@ use bevy::math::Vec2;
 
 const PIXEL_MOVE_FLOAT_PRECISION: f32 = 0.4;
 
-fn slope(lhs: &Vec2, rhs: &Vec2) -> f32 {
+pub(crate) fn slope(lhs: &Vec2, rhs: &Vec2) -> f32 {
     (lhs.x - rhs.x) / (lhs.y - rhs.y)
 }
 
@@ -28,8 +28,6 @@ fn point_on_path(p: &Vec2, path: (&Vec2, &Vec2)) -> bool {
     between(p.x, path.0.x, path.1.x) && between(p.y, path.0.y, path.1.y)
 }
 
-// TODO: Each move we get a little deviation from the path.
-//       We could re-adjust each move.
 pub(crate) fn calculate_next_position_on_path(
     point: &Vec2,
     path: &Vec<Vec2>,

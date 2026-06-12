@@ -1,5 +1,5 @@
 use crate::{
-    deletable::update_deletables, dragged::*, enemy::*, health::*, math::*, tower::*, util::*,
+    deletable::update_deletables, dragged::*, enemy::*, game, health::*, math::*, tower::*, util::*,
 };
 use bevy::{
     color::palettes::css::{BLUE, RED, WHITE},
@@ -108,12 +108,19 @@ fn setup(
     }
 
     // Path.
-    let path_shape = meshes.add(Polyline2d::new(game_map.path.clone()));
-    commands.spawn((
-        Mesh2d(path_shape),
-        MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)))),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-    ));
+    for i in 0..game_map.path.len() - 1 {
+        let midpoint = game_map.path[i].midpoint(game_map.path[i + 1]);
+        commands.spawn((
+            Mesh2d(meshes.add(Capsule2d::new(
+                25.0,
+                game_map.path[i].distance(game_map.path[i + 1]),
+            ))),
+            MeshMaterial2d(materials.add(Color::Srgba(Srgba::new(0.1, 0.1, 0.1, 1.0)))),
+            Transform::from_xyz(midpoint.x, midpoint.y, 0.0).with_rotation(Quat::from_rotation_z(
+                (game_map.path[i] - game_map.path[i + 1]).to_angle() + std::f32::consts::PI / 2.0,
+            )),
+        ));
+    }
 }
 
 fn update_enemy_movement(
@@ -334,10 +341,15 @@ impl Plugin for GamePlugin {
         })
         .insert_resource(GameMap {
             path: vec![
-                (-200.0, -200.0).into(),
-                (-200.0, 0.0).into(),
+                (-300.0, 384.0).into(),
+                (-300.0, -300.0).into(),
+                (300.0, -300.0).into(),
+                (300.0, -200.0).into(),
+                (-150.0, -200.0).into(),
+                (-150.0, 0.0).into(),
                 (200.0, 0.0).into(),
                 (200.0, 200.0).into(),
+                (512.0, 200.0).into(),
             ],
         })
         .insert_resource(ShootingTimer(shooting_timers))
