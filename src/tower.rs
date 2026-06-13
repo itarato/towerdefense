@@ -9,18 +9,21 @@ pub(crate) const TOWER_SPECS: [TowerSpecs; 3] = [
         damage: 10,
         shooting_freq_secs: 0.1,
         color: Color::Srgba(Srgba::new(0.2, 0.4, 0.6, 1.0)),
+        cost: 1000,
     },
     TowerSpecs {
         distance: 200.0,
         damage: 50,
         shooting_freq_secs: 0.6,
-        color: Color::Srgba(Srgba::new(0.4, 0.2, 0.6, 1.0)),
+        color: Color::Srgba(Srgba::new(0.4, 0.6, 0.8, 1.0)),
+        cost: 1800,
     },
     TowerSpecs {
         distance: 300.0,
         damage: 80,
         shooting_freq_secs: 1.2,
-        color: Color::Srgba(Srgba::new(0.6, 0.2, 0.4, 1.0)),
+        color: Color::Srgba(Srgba::new(0.6, 0.8, 1.0, 1.0)),
+        cost: 3200,
     },
 ];
 
@@ -29,6 +32,7 @@ pub(crate) struct TowerSpecs {
     pub(crate) damage: i32,
     pub(crate) shooting_freq_secs: f32,
     pub(crate) color: Color,
+    pub(crate) cost: i32,
 }
 
 impl TowerSpecs {

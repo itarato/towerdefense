@@ -2,7 +2,7 @@ use crate::{
     deletable::update_deletables, dragged::*, enemy::*, health::*, math::*, tower::*, util::*,
 };
 use bevy::{
-    color::palettes::css::{GRAY, RED},
+    color::palettes::css::{GRAY, WHITE},
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     input::{ButtonState, mouse::MouseButtonInput},
     prelude::*,
@@ -11,7 +11,8 @@ use rand::prelude::*;
 
 #[derive(Resource)]
 struct GameState {
-    base_life: i32,
+    life: i32,
+    budget_spent: i32,
     waves: Waves,
 }
 
@@ -44,7 +45,7 @@ fn setup(
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(10.0),
-                top: Val::Px(10.0),
+                bottom: Val::Px(10.0),
                 ..default()
             },
         ))
@@ -52,10 +53,10 @@ fn setup(
             ScoreText,
             TextSpan::default(),
             TextFont {
-                font_size: 24.0,
+                font_size: 16.0,
                 ..default()
             },
-            TextColor(RED.into()),
+            TextColor(WHITE.into()),
         ));
 
     // FPS text;
@@ -86,18 +87,20 @@ fn setup(
         ));
 
     // Tower pickers:
-    let tower_kind_width = 64.0;
+    let tower_kind_width = 32.0;
     let tower_kind_height = 32.0;
     for (i, tower_spec) in TOWER_SPECS.iter().enumerate() {
         let tower_kind_handle = meshes.add(Rectangle::new(tower_kind_width, tower_kind_height));
         let bound_rect = Rect {
             min: Vec2 {
-                x: -(WIN_W as f32) / 2.0,
-                y: 200.0 + i as f32 * 48.0,
+                x: -tower_kind_width - 16.0 + (tower_kind_width + 16.0) * i as f32,
+                y: WIN_H as f32 / 2.0 - tower_kind_height,
             },
             max: Vec2 {
-                x: -(WIN_W as f32) / 2.0 + tower_kind_width,
-                y: 200.0 + i as f32 * 48.0 + tower_kind_height,
+                x: -tower_kind_width - 16.0
+                    + (tower_kind_width + 16.0) * i as f32
+                    + tower_kind_width,
+                y: WIN_H as f32 / 2.0,
             },
         };
         commands.spawn((
@@ -139,7 +142,7 @@ fn update_enemy_movement(
     for (entity, mut transform, enemy) in &mut query {
         if path_completed(&transform.translation.xy(), &game_map.path) {
             commands.entity(entity).despawn();
-            game_state.base_life -= 5;
+            game_state.life -= 5;
         } else {
             let next_pos = calculate_next_position_on_path(
                 &transform.translation.xy(),
@@ -218,7 +221,10 @@ fn update_shooting(
 
 fn update_score(mut query: Query<&mut TextSpan, With<ScoreText>>, game_state: Res<GameState>) {
     for mut span in &mut query {
-        **span = format!("Health: {}", game_state.base_life);
+        **span = format!(
+            "Health {} | Spent ${}",
+            game_state.life, game_state.budget_spent
+        );
     }
 }
 
@@ -242,14 +248,16 @@ fn update_detect_tower_picking(
                         cam.viewport_to_world_2d(cam_transform, cursor_pos).unwrap();
 
                     if selectable_tower_bound.0.contains(cursor_world_pos) {
-                        let mesh_handle = meshes.add(Circle::new(TOWER_SIZE_RADIUS));
                         let reach_mesh_handle =
                             meshes.add(Circle::new(TOWER_SPECS[tower_kind.0 as usize].distance));
                         commands
                             .spawn((
                                 TowerCandidate(tower_kind.0),
                                 Dragged,
-                                Mesh2d(mesh_handle),
+                                Mesh2d(meshes.add(RegularPolygon::new(
+                                    TOWER_SIZE_RADIUS,
+                                    tower_kind.0 as u32 + 3,
+                                ))),
                                 MeshMaterial2d(
                                     materials.add(TOWER_SPECS[tower_kind.0 as usize].color),
                                 ),
@@ -280,6 +288,7 @@ fn update_drop_tower(
     camera: Single<(&Camera, &GlobalTransform)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    mut game_state: ResMut<GameState>,
 ) {
     for event in mouse_event_reader.read() {
         if event.button == MouseButton::Left && event.state == ButtonState::Released {
@@ -287,7 +296,9 @@ fn update_drop_tower(
             let (cam, cam_transform) = *camera;
             let cursor_world_pos = cam.viewport_to_world_2d(cam_transform, cursor_pos).unwrap();
             let (candidate_entity, candidate) = *candidate;
+
             commands.entity(candidate_entity).despawn();
+
             spawn_tower(
                 &mut commands,
                 &mut meshes,
@@ -295,6 +306,8 @@ fn update_drop_tower(
                 cursor_world_pos,
                 candidate.0,
             );
+
+            game_state.budget_spent += TOWER_SPECS[candidate.0 as usize].cost;
         }
     }
 }
@@ -342,8 +355,9 @@ impl Plugin for GamePlugin {
             .collect();
 
         app.insert_resource(GameState {
-            base_life: 100,
+            life: 100,
             waves: Waves::load(),
+            budget_spent: 0,
         })
         .insert_resource(GameMap {
             path: vec![

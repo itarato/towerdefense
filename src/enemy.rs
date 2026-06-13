@@ -8,17 +8,17 @@ pub(crate) const ENEMY_SPECS: [EnemySpecs; 3] = [
     EnemySpecs {
         speed: 120.0,
         health: 40,
-        color: Color::Srgba(Srgba::new(0.3, 0.1, 0.9, 1.0)),
+        color: Color::Srgba(Srgba::new(0.6, 0.4, 0.2, 1.0)),
     },
     EnemySpecs {
         speed: 80.0,
         health: 100,
-        color: Color::Srgba(Srgba::new(0.1, 0.9, 0.3, 1.0)),
+        color: Color::Srgba(Srgba::new(0.8, 0.6, 0.4, 1.0)),
     },
     EnemySpecs {
         speed: 50.0,
         health: 200,
-        color: Color::Srgba(Srgba::new(0.9, 0.1, 0.3, 1.0)),
+        color: Color::Srgba(Srgba::new(1.0, 0.8, 0.6, 1.0)),
     },
 ];
 
@@ -104,7 +104,7 @@ impl Waves {
                             count: 10,
                             kind: 1,
                             start_timer: Timer::from_seconds(2.5, TimerMode::Once),
-                            spawn_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                            spawn_timer: Timer::from_seconds(0.6, TimerMode::Repeating),
                         },
                     ],
                 },
@@ -113,7 +113,7 @@ impl Waves {
                         count: 10,
                         kind: 2,
                         start_timer: Timer::from_seconds(1.0, TimerMode::Once),
-                        spawn_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                        spawn_timer: Timer::from_seconds(1.0, TimerMode::Repeating),
                     }],
                 },
             ],
@@ -161,7 +161,7 @@ pub(crate) fn spawn_enemy(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
 ) {
-    let shape = meshes.add(RegularPolygon::new(ENEMY_SIZE_RADIUS, 6));
+    let shape = meshes.add(RegularPolygon::new(ENEMY_SIZE_RADIUS, 7));
     commands
         .spawn((
             Enemy(kind),
